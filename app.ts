@@ -345,13 +345,7 @@ function render() {
     drawPlacedImage(placedImages[i]!)
   }
 
-  // Draw strokes
-  for (let si = 0; si < strokes.length; si++) {
-    drawStrokePath(strokes[si]!.points, strokes[si]!.style)
-  }
-  if (currentStroke !== null) {
-    drawStrokePath(currentStroke.points, currentStroke.style)
-  }
+  // Strokes are invisible — text just wraps around them
 
   // Layout text
   if (prepared === null) return
