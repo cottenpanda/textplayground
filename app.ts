@@ -45,8 +45,43 @@ type PlacedImage = {
   shape: ImageShape
   dragging: boolean
   dragOffsetX: number; dragOffsetY: number
+  // Per-row alpha edges for transparent images (normalized 0-1)
+  alphaEdges: Array<{ left: number; right: number } | null> | null
 }
 const placedImages: PlacedImage[] = []
+
+// --- Alpha edge scanning ---
+function scanAlphaEdges(img: HTMLImageElement): Array<{ left: number; right: number } | null> | null {
+  const oc = new OffscreenCanvas(img.naturalWidth, img.naturalHeight)
+  const octx = oc.getContext('2d')
+  if (!octx) return null
+  octx.drawImage(img, 0, 0)
+  const { data, width, height } = octx.getImageData(0, 0, img.naturalWidth, img.naturalHeight)
+
+  // Check if image has any transparency at all
+  let hasTransparency = false
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i]! < 200) { hasTransparency = true; break }
+  }
+  if (!hasTransparency) return null // fully opaque, use rectangle
+
+  const edges: Array<{ left: number; right: number } | null> = []
+  for (let y = 0; y < height; y++) {
+    let left = -1, right = -1
+    for (let x = 0; x < width; x++) {
+      if (data[(y * width + x) * 4 + 3]! > 20) {
+        if (left === -1) left = x
+        right = x
+      }
+    }
+    if (left === -1) {
+      edges.push(null)
+    } else {
+      edges.push({ left: left / width, right: (right + 1) / width })
+    }
+  }
+  return edges
+}
 
 // --- Interval math for pretext wrapping ---
 type Interval = { left: number; right: number }
@@ -129,7 +164,25 @@ function getImageIntervalsForBand(bandTop: number, bandBottom: number): Interval
 
     if (img.shape === 'original') {
       if (bandBottom <= img.y - pad || bandTop >= img.y + img.h + pad) continue
-      intervals.push({ left: img.x - pad, right: img.x + img.w + pad })
+      if (img.alphaEdges) {
+        // Use actual pixel edges
+        const rows = img.alphaEdges.length
+        const rowTop = Math.max(0, Math.floor(((bandTop - img.y) / img.h) * rows))
+        const rowBot = Math.min(rows - 1, Math.ceil(((bandBottom - img.y) / img.h) * rows))
+        let minL = Infinity, maxR = -Infinity
+        for (let row = rowTop; row <= rowBot; row++) {
+          const e = img.alphaEdges[row]
+          if (e) {
+            const l = img.x + e.left * img.w
+            const r = img.x + e.right * img.w
+            if (l < minL) minL = l
+            if (r > maxR) maxR = r
+          }
+        }
+        if (minL < maxR) intervals.push({ left: minL - pad, right: maxR + pad })
+      } else {
+        intervals.push({ left: img.x - pad, right: img.x + img.w + pad })
+      }
     } else if (img.shape === 'square') {
       const side = Math.min(img.w, img.h)
       const sx = cx - side / 2, sy = cy - side / 2
@@ -401,9 +454,11 @@ if (uploadBtn && fileInput) {
         el.src = dataUrl
         el.style.cssText = 'position:fixed;pointer-events:none;z-index:2;'
         document.body.appendChild(el)
+        const alphaEdges = scanAlphaEdges(img)
         const placed: PlacedImage = {
           el, dataUrl, x: (W - w) / 2, y: (H - h) / 2, w, h,
           shape: 'original', dragging: false, dragOffsetX: 0, dragOffsetY: 0,
+          alphaEdges,
         }
         syncImageEl(placed)
         placedImages.push(placed)
