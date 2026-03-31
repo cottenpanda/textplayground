@@ -37,7 +37,7 @@ const PATH_RADIUS = 18 // how wide text avoids the drawn path
 
 // --- Image state ---
 type ImageShape = 'original' | 'circle' | 'heart' | 'square'
-const SHAPES: ImageShape[] = ['original', 'circle', 'heart', 'square']
+const SHAPES: ImageShape[] = ['original', 'circle', 'square']
 type PlacedImage = {
   el: HTMLImageElement
   dataUrl: string
