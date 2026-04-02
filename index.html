@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;600&family=Playfair+Display:ital,opsz,wght@0,5..1200,400;0,5..1200,700;0,5..1200,900;1,5..1200,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet" />
   <title>Text Playground</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -18,6 +18,43 @@
     .placed-image {
       animation: float 3s ease-in-out infinite;
     }
+    #top-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: calc(44px + env(safe-area-inset-top, 0px));
+      padding-top: env(safe-area-inset-top, 0px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      z-index: 20;
+    }
+    #mode-toggle {
+      display: flex;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    #mode-toggle button {
+      font: 600 12px Helvetica, Arial, sans-serif;
+      padding: 6px 18px;
+      border: none;
+      background: transparent;
+      color: rgba(255,255,255,0.4);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: all 0.15s;
+    }
+    #mode-toggle button.mode-active {
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+    }
+    #mode-toggle button:active { opacity: 0.7; }
     canvas {
       position: fixed;
       top: 0;
@@ -69,6 +106,12 @@
 </head>
 <body>
   <canvas id="canvas"></canvas>
+  <div id="top-bar">
+    <div id="mode-toggle">
+      <button id="mode-mobile" class="mode-active">Mobile</button>
+      <button id="mode-desktop">Desktop</button>
+    </div>
+  </div>
   <div id="bottom-bar">
     <button id="shake-btn">Shake</button>
     <button id="upload-btn">Image</button>

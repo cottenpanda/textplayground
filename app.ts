@@ -11,13 +11,57 @@ const PARAGRAPHS = [
   `Sometimes the hardest part is simply starting. Once you begin, things shift. Ideas connect, directions form, and small steps add up. This space is meant to support that process quietly in the background—giving you just enough structure to stay grounded, while leaving room for exploration and change. Design is rarely a straight line. It moves between uncertainty and clarity, exploration and decision. This environment is built to support that rhythm—helping you navigate complexity, test ideas quickly, and shape outcomes with intention. Over time, what starts as ambiguity becomes something structured, thoughtful, and real.`,
 ]
 
+type Mode = 'mobile' | 'desktop'
+let mode: Mode = 'mobile'
+
 const FONT = '16px "Source Code Pro", monospace'
 const LINE_HEIGHT = 24
 const PADDING = 16
 const TEXT_COLOR = 'rgba(255, 255, 255, 0.82)'
 const BAR_HEIGHT = 56
+const TOP_BAR_HEIGHT = 44
 const FINGER_RADIUS = 40
 const PARA_GAP = 16
+
+// Desktop magazine config
+const DESK_FONT = '15px "Source Serif 4", Georgia, serif'
+const DESK_LINE_HEIGHT = 24
+const DESK_PAD = 48
+const DESK_PARA_GAP = 18
+const DESK_TEXT_COLOR = 'rgba(255, 255, 255, 0.75)'
+const DESK_COL_GAP = 40
+const DESK_TITLE_FONT = '72px "Playfair Display", Georgia, serif'
+const DESK_TITLE_LH = 78
+const DESK_SUB_FONT = 'italic 20px "Playfair Display", Georgia, serif'
+const QUOTE_TEXT = 'Simplicity is about subtracting the obvious and adding the meaningful.'
+const QUOTE_FONT = 'bold 24px "Playfair Display", Georgia, serif'
+const QUOTE_LH = 34
+const QUOTE_COLOR = '#f2c4b8'
+let preparedQuote: PreparedTextWithSegments | null = null
+let preparedTitle: PreparedTextWithSegments | null = null
+let preparedSub: PreparedTextWithSegments | null = null
+const TITLE_TEXT = 'Text Play'
+const SUB_TEXT = 'An interactive typography experiment'
+
+// --- Auto-moving image (desktop) ---
+let autoImgEl: HTMLImageElement | null = null
+let autoImgX = 0
+let autoImgY = 0
+let autoImgW = 150
+let autoImgH = 150
+let autoImgVx = 1.5
+let autoImgVy = 1.0
+let autoImgActive = false
+let autoImgAlphaEdges: Array<{ left: number; right: number } | null> | null = null
+
+// --- Draggable pull quote ---
+const QUOTE_W = 260
+const QUOTE_H = 220
+let quoteX = 0
+let quoteY = 0
+let quoteDragging = false
+let quoteDragOffX = 0
+let quoteDragOffY = 0
 
 // --- Canvas ---
 const canvas = document.getElementById('canvas') as HTMLCanvasElement
@@ -26,8 +70,10 @@ let W = 0, H = 0
 
 // --- Pretext prepared paragraphs ---
 let preparedParas: PreparedTextWithSegments[] = []
+let preparedDesk: PreparedTextWithSegments[] = []
 
 let pointer: { x: number; y: number } | null = null
+let desktopMouse: { x: number; y: number } | null = null
 
 // --- Stroke tracking for path wrapping ---
 type Stroke = Array<{ x: number; y: number }>
@@ -231,45 +277,340 @@ function carveSlots(base: Interval, blocked: Interval[]): Interval[] {
   return slots.filter(function (s) { return s.right - s.left >= 20 })
 }
 
-// --- Render using pretext ---
-function render() {
-  ctx.clearRect(0, 0, W, H)
-  if (preparedParas.length === 0) return
+// --- Quote interval for body text wrapping (per-line width) ---
+const QLINES_META = [
+  { font: 'bold 18px "Playfair Display"', text: 'SIMPLICITY IS ABOUT', yOff: 16, h: 28 },
+  { font: 'bold 22px "Playfair Display"', text: 'SUBTRACTING THE', yOff: 44, h: 32 },
+  { font: 'bold 36px "Playfair Display"', text: 'OBVIOUS', yOff: 76, h: 42 },
+  { font: 'bold 22px "Playfair Display"', text: 'AND ADDING THE', yOff: 118, h: 34 },
+  { font: 'bold 40px "Playfair Display"', text: 'MEANINGFUL.', yOff: 152, h: 48 },
+]
 
-  ctx.font = FONT
-  ctx.fillStyle = TEXT_COLOR
-  ctx.textBaseline = 'top'
-  ctx.globalAlpha = 1
+let quoteLineWidths: number[] = []
+function cacheQuoteWidths() {
+  quoteLineWidths = []
+  for (const ql of QLINES_META) {
+    ctx.font = ql.font
+    quoteLineWidths.push(ctx.measureText(ql.text).width)
+  }
+}
 
-  let y = PADDING
-  const maxY = H - PADDING
+function getQuoteIntervalForBand(bandTop: number, bandBottom: number): Interval[] {
+  if (mode !== 'desktop') return []
+  const pad = 4
+  const cx = quoteX + QUOTE_W / 2
+  const first = QLINES_META[0]!
+  const last = QLINES_META[QLINES_META.length - 1]!
+  const qTop = quoteY + first.yOff
+  const qBot = quoteY + last.yOff + last.h
 
-  for (let paraIdx = 0; paraIdx < preparedParas.length; paraIdx++) {
-    const prepared = preparedParas[paraIdx]!
-    let cursor: LayoutCursor = { segmentIndex: 0, graphemeIndex: 0 }
-    let paraDone = false
+  // Not in quote range at all
+  if (bandBottom <= qTop - 2 || bandTop >= qBot + 2) return []
 
-    while (y + LINE_HEIGHT <= maxY && !paraDone) {
+  // Find the widest overlapping quote line for this band
+  // Use cached widths so we don't mutate ctx.font
+  let maxHalfW = 0
+  for (let i = 0; i < QLINES_META.length; i++) {
+    const ql = QLINES_META[i]!
+    const lineTop = quoteY + ql.yOff
+    const lineBot = lineTop + ql.h
+    if (bandBottom > lineTop - pad && bandTop < lineBot + pad) {
+      if (quoteLineWidths[i]! / 2 > maxHalfW) maxHalfW = quoteLineWidths[i]! / 2
+    }
+  }
+
+  // If between lines (gap), use nearest line's width
+  if (maxHalfW === 0) {
+    const bandMid = (bandTop + bandBottom) / 2
+    let minDist = Infinity
+    for (let i = 0; i < QLINES_META.length; i++) {
+      const lineMid = quoteY + QLINES_META[i]!.yOff + QLINES_META[i]!.h / 2
+      const d = Math.abs(bandMid - lineMid)
+      if (d < minDist) { minDist = d; maxHalfW = quoteLineWidths[i]! / 2 }
+    }
+  }
+
+  if (maxHalfW <= 0) return []
+  return [{ left: cx - maxHalfW - pad, right: cx + maxHalfW + pad }]
+}
+
+// --- Auto-moving image interval (reuses alpha edges like mobile) ---
+function getAutoImgIntervalForBand(bandTop: number, bandBottom: number): Interval[] {
+  if (!autoImgActive) return []
+  const pad = 8
+  if (bandBottom <= autoImgY - pad || bandTop >= autoImgY + autoImgH + pad) return []
+  if (autoImgAlphaEdges) {
+    const rows = autoImgAlphaEdges.length
+    const rowTop = Math.max(0, Math.floor(((bandTop - autoImgY) / autoImgH) * rows))
+    const rowBot = Math.min(rows - 1, Math.ceil(((bandBottom - autoImgY) / autoImgH) * rows))
+    let minL = Infinity, maxR = -Infinity
+    for (let row = rowTop; row <= rowBot; row++) {
+      const e = autoImgAlphaEdges[row]
+      if (e) {
+        const l = autoImgX + e.left * autoImgW
+        const r = autoImgX + e.right * autoImgW
+        if (l < minL) minL = l
+        if (r > maxR) maxR = r
+      }
+    }
+    if (minL < maxR) return [{ left: minL - pad, right: maxR + pad }]
+    return []
+  }
+  return [{ left: autoImgX - pad, right: autoImgX + autoImgW + pad }]
+}
+
+// --- Heat map color ---
+const HEAT_RADIUS = 250
+
+function heatColor(wx: number, wy: number, baseColor: string): string {
+  if (!desktopMouse) return baseColor
+  const dx = wx - desktopMouse.x
+  const dy = wy - desktopMouse.y
+  const dist = Math.sqrt(dx * dx + dy * dy)
+  if (dist > HEAT_RADIUS) return baseColor
+
+  const t = 1 - dist / HEAT_RADIUS // 1 = hot (close), 0 = cool (far)
+
+  // Cool (base) -> warm yellow -> orange -> red
+  if (t < 0.3) {
+    // base -> warm white
+    const s = t / 0.3
+    const r = Math.round(180 + 75 * s)
+    const g = Math.round(180 + 55 * s)
+    const b = Math.round(200 - 80 * s)
+    return `rgb(${r},${g},${b})`
+  } else if (t < 0.6) {
+    // warm white -> orange
+    const s = (t - 0.3) / 0.3
+    const r = 255
+    const g = Math.round(235 - 120 * s)
+    const b = Math.round(120 - 90 * s)
+    return `rgb(${r},${g},${b})`
+  } else {
+    // orange -> red
+    const s = (t - 0.6) / 0.4
+    const r = 255
+    const g = Math.round(115 - 80 * s)
+    const b = Math.round(30 + 20 * s)
+    return `rgb(${r},${g},${b})`
+  }
+}
+
+// --- Desktop column helper ---
+function deskColumn(
+  paras: PreparedTextWithSegments[],
+  startPara: number, startCursor: LayoutCursor,
+  left: number, right: number, startY: number, maxY: number,
+  font: string, lh: number, pg: number, color: string,
+): { paraIdx: number; cursor: LayoutCursor; y: number } {
+  ctx.font = font
+  let y = startY
+  let paraIdx = startPara
+  let cursor = startCursor
+  const spaceW = ctx.measureText(' ').width
+
+  while (paraIdx < paras.length) {
+    const prepared = paras[paraIdx]!
+    let done = false
+    while (y + lh <= maxY && !done) {
       const bandTop = y
-      const bandBottom = y + LINE_HEIGHT
-      const blocked = getImageIntervalsForBand(bandTop, bandBottom)
-        .concat(getStrokeIntervalsForBand(bandTop, bandBottom))
-        .concat(getFingerIntervalsForBand(bandTop, bandBottom))
-      const slots = carveSlots({ left: PADDING, right: W - PADDING }, blocked)
+      const bandBottom = y + lh
+      const blocked = getQuoteIntervalForBand(bandTop, bandBottom)
+        .concat(getAutoImgIntervalForBand(bandTop, bandBottom))
+      const slots = carveSlots({ left, right }, blocked)
 
-      if (slots.length === 0) { y += LINE_HEIGHT; continue }
+      if (slots.length === 0) { y += lh; continue }
 
       for (let si = 0; si < slots.length; si++) {
         const slot = slots[si]!
-        const width = slot.right - slot.left
-        const line = layoutNextLine(prepared, cursor, width)
-        if (line === null) { paraDone = true; break }
-        ctx.fillText(line.text, slot.left, bandTop)
+        const line = layoutNextLine(prepared, cursor, slot.right - slot.left)
+        if (line === null) { done = true; break }
+
+        // Render with heat color + 3D sphere displacement
+        if (desktopMouse) {
+          const words = line.text.split(' ')
+          let wx = slot.left
+          ctx.font = font
+          for (let wi = 0; wi < words.length; wi++) {
+            const word = words[wi]!
+            if (word === '') continue
+            const ww = ctx.measureText(word).width
+            const wcx = wx + ww / 2
+            const wcy = y + lh / 2
+            const dx = wcx - desktopMouse.x
+            const dy = wcy - desktopMouse.y
+            const dist = Math.sqrt(dx * dx + dy * dy)
+            const R = HEAT_RADIUS
+
+            let ox = 0, oy = 0
+            if (dist < R && dist > 0.1) {
+              const t = 1 - dist / R
+              const push = t * t * 30
+              ox = (dx / dist) * push
+              oy = (dy / dist) * push
+            }
+
+            ctx.fillStyle = heatColor(wcx, wcy, color)
+            ctx.fillText(word, wx + ox, y + oy)
+            wx += ww + spaceW
+          }
+        } else {
+          ctx.fillStyle = color
+          ctx.fillText(line.text, slot.left, y)
+        }
+
         cursor = line.end
       }
-      y += LINE_HEIGHT
+      y += lh
     }
-    if (paraIdx < preparedParas.length - 1) y += PARA_GAP
+    if (done) {
+      paraIdx++
+      cursor = { segmentIndex: 0, graphemeIndex: 0 }
+      if (paraIdx < paras.length) y += pg
+    } else break
+  }
+  return { paraIdx, cursor, y }
+}
+
+// --- Render using pretext ---
+function render() {
+  ctx.clearRect(0, 0, W, H)
+  ctx.textBaseline = 'top'
+  ctx.globalAlpha = 1
+
+  const topOffset = TOP_BAR_HEIGHT
+
+  if (mode === 'mobile') {
+    if (preparedParas.length === 0) return
+    ctx.font = FONT
+    ctx.fillStyle = TEXT_COLOR
+
+    let y = PADDING + topOffset
+    const maxY = H - PADDING
+
+    for (let paraIdx = 0; paraIdx < preparedParas.length; paraIdx++) {
+      const prepared = preparedParas[paraIdx]!
+      let cursor: LayoutCursor = { segmentIndex: 0, graphemeIndex: 0 }
+      let paraDone = false
+
+      while (y + LINE_HEIGHT <= maxY && !paraDone) {
+        const bandTop = y
+        const bandBottom = y + LINE_HEIGHT
+        const blocked = getImageIntervalsForBand(bandTop, bandBottom)
+          .concat(getStrokeIntervalsForBand(bandTop, bandBottom))
+          .concat(getFingerIntervalsForBand(bandTop, bandBottom))
+        const slots = carveSlots({ left: PADDING, right: W - PADDING }, blocked)
+
+        if (slots.length === 0) { y += LINE_HEIGHT; continue }
+
+        for (let si = 0; si < slots.length; si++) {
+          const slot = slots[si]!
+          const width = slot.right - slot.left
+          const line = layoutNextLine(prepared, cursor, width)
+          if (line === null) { paraDone = true; break }
+          ctx.fillText(line.text, slot.left, bandTop)
+          cursor = line.end
+        }
+        y += LINE_HEIGHT
+      }
+      if (paraIdx < preparedParas.length - 1) y += PARA_GAP
+    }
+  } else {
+    // --- Desktop: 3-column magazine ---
+    if (preparedDesk.length === 0) return
+    const pad = DESK_PAD
+    const gap = DESK_COL_GAP
+    const colWidth = (W - pad * 2 - gap * 2) / 3
+    const col1L = pad, col1R = col1L + colWidth
+    const col2L = col1R + gap, col2R = col2L + colWidth
+    const col3L = col2R + gap, col3R = col3L + colWidth
+    const startY = pad + topOffset
+    const maxY = H - pad
+
+    // Column dividers
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)'
+    ctx.lineWidth = 1
+    for (const dx of [(col1R + col2L) / 2, (col2R + col3L) / 2]) {
+      ctx.beginPath(); ctx.moveTo(dx, startY); ctx.lineTo(dx, maxY); ctx.stroke()
+    }
+
+    // Column 1: headline + subtitle (using pretext, wraps around obstacles)
+    let c1y = startY
+
+    // Title
+    if (preparedTitle) {
+      ctx.font = DESK_TITLE_FONT
+      ctx.fillStyle = '#ffffff'
+      let titleCursor: LayoutCursor = { segmentIndex: 0, graphemeIndex: 0 }
+      while (c1y + DESK_TITLE_LH <= maxY) {
+        const blocked = getQuoteIntervalForBand(c1y, c1y + DESK_TITLE_LH)
+          .concat(getAutoImgIntervalForBand(c1y, c1y + DESK_TITLE_LH))
+        const slots = carveSlots({ left: col1L, right: col1R }, blocked)
+        if (slots.length === 0) { c1y += DESK_TITLE_LH; continue }
+        const line = layoutNextLine(preparedTitle, titleCursor, slots[0]!.right - slots[0]!.left)
+        if (line === null) break
+        ctx.fillStyle = heatColor(slots[0]!.left + line.width / 2, c1y + DESK_TITLE_LH / 2, '#ffffff')
+        ctx.fillText(line.text, slots[0]!.left, c1y)
+        titleCursor = line.end
+        c1y += DESK_TITLE_LH
+      }
+      c1y += 8
+    }
+
+    // Subtitle
+    if (preparedSub) {
+      ctx.font = DESK_SUB_FONT
+      const subLH = 26
+      let subCursor: LayoutCursor = { segmentIndex: 0, graphemeIndex: 0 }
+      while (c1y + subLH <= maxY) {
+        const blocked = getQuoteIntervalForBand(c1y, c1y + subLH)
+          .concat(getAutoImgIntervalForBand(c1y, c1y + subLH))
+        const slots = carveSlots({ left: col1L, right: col1R }, blocked)
+        if (slots.length === 0) { c1y += subLH; continue }
+        const line = layoutNextLine(preparedSub, subCursor, slots[0]!.right - slots[0]!.left)
+        if (line === null) break
+        ctx.fillStyle = heatColor(slots[0]!.left + line.width / 2, c1y + subLH / 2, 'rgba(255,255,255,0.45)')
+        ctx.fillText(line.text, slots[0]!.left, c1y)
+        subCursor = line.end
+        c1y += subLH
+      }
+      c1y += 14
+    }
+
+    // Rule
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)'
+    ctx.beginPath(); ctx.moveTo(col1L, c1y); ctx.lineTo(col1R, c1y); ctx.stroke()
+    c1y += 16
+
+    const r1 = deskColumn(preparedDesk, 0, { segmentIndex: 0, graphemeIndex: 0 },
+      col1L, col1R, c1y, maxY, DESK_FONT, DESK_LINE_HEIGHT, DESK_PARA_GAP, DESK_TEXT_COLOR)
+
+    // Column 2
+    const r2 = deskColumn(preparedDesk, r1.paraIdx, r1.cursor,
+      col2L, col2R, startY, maxY, DESK_FONT, DESK_LINE_HEIGHT, DESK_PARA_GAP, DESK_TEXT_COLOR)
+
+    // Column 3
+    deskColumn(preparedDesk, r2.paraIdx, r2.cursor,
+      col3L, col3R, startY, maxY, DESK_FONT, DESK_LINE_HEIGHT, DESK_PARA_GAP, DESK_TEXT_COLOR)
+
+    // --- Draggable pull quote (styled, fixed layout) ---
+    const qcx = quoteX + QUOTE_W / 2
+    ctx.textAlign = 'center'
+
+    const qLines = [
+      { text: 'SIMPLICITY IS ABOUT', font: 'bold 18px "Playfair Display"', color: '#f2c4b8', yOff: 16 },
+      { text: 'SUBTRACTING THE', font: 'bold 22px "Playfair Display"', color: '#f2c4b8', yOff: 44 },
+      { text: 'OBVIOUS', font: 'bold 36px "Playfair Display"', color: '#e8ddd4', yOff: 76 },
+      { text: 'AND ADDING THE', font: 'bold 22px "Playfair Display"', color: '#ffffff', yOff: 118 },
+      { text: 'MEANINGFUL.', font: 'bold 40px "Playfair Display"', color: '#7ed695', yOff: 152 },
+    ]
+
+    for (const ql of qLines) {
+      ctx.font = ql.font
+      ctx.fillStyle = ql.color
+      ctx.fillText(ql.text, qcx, quoteY + ql.yOff)
+    }
+    ctx.textAlign = 'left'
   }
 }
 
@@ -372,6 +713,15 @@ canvas.addEventListener('pointerdown', function (e) {
   if (isPinching) return
   const x = e.clientX, y = e.clientY
   pointerDownTime = Date.now(); pointerDownPos = { x, y }
+
+  // Check quote drag in desktop mode
+  if (mode === 'desktop' && x >= quoteX && x <= quoteX + QUOTE_W && y >= quoteY && y <= quoteY + QUOTE_H) {
+    quoteDragging = true
+    quoteDragOffX = x - quoteX
+    quoteDragOffY = y - quoteY
+    return
+  }
+
   const hit = hitTestImage(x, y)
   if (hit) {
     tappedImage = hit; draggingImage = hit
@@ -387,6 +737,14 @@ canvas.addEventListener('pointerdown', function (e) {
 canvas.addEventListener('pointermove', function (e) {
   if (isPinching) return
   const x = e.clientX, y = e.clientY
+
+  if (quoteDragging) {
+    quoteX = x - quoteDragOffX
+    quoteY = y - quoteDragOffY
+    render()
+    return
+  }
+
   if (draggingImage) {
     const dx = x - pointerDownPos.x, dy = y - pointerDownPos.y
     if (dx * dx + dy * dy > 100) {
@@ -412,6 +770,11 @@ canvas.addEventListener('pointermove', function (e) {
 })
 
 function pointerUp() {
+  if (quoteDragging) {
+    quoteDragging = false
+    render()
+    return
+  }
   if (draggingImage) {
     draggingImage.dragging = false
     if (tappedImage && Date.now() - pointerDownTime < 300) {
@@ -450,20 +813,39 @@ if (uploadBtn && fileInput) {
         const maxSize = 150
         const scale = Math.min(maxSize / img.width, maxSize / img.height, 1)
         const w = img.width * scale, h = img.height * scale
-        const el = document.createElement('img')
-        el.src = dataUrl
-        el.className = 'placed-image'
-        el.style.cssText = 'position:fixed;pointer-events:none;z-index:2;'
-        document.body.appendChild(el)
-        const alphaEdges = scanAlphaEdges(img)
-        const placed: PlacedImage = {
-          el, dataUrl, x: (W - w) / 2, y: (H - h) / 2, w, h,
-          shape: 'original', dragging: false, dragOffsetX: 0, dragOffsetY: 0,
-          alphaEdges,
+
+        if (mode === 'desktop') {
+          // Desktop: auto-moving image
+          if (autoImgEl) autoImgEl.remove()
+          const el = document.createElement('img')
+          el.src = dataUrl
+          el.style.cssText = 'position:fixed;pointer-events:none;z-index:2;object-fit:contain;'
+          document.body.appendChild(el)
+          autoImgEl = el
+          autoImgW = w; autoImgH = h
+          autoImgAlphaEdges = scanAlphaEdges(img)
+          autoImgX = DESK_PAD
+          autoImgY = TOP_BAR_HEIGHT + DESK_PAD + 40
+          autoImgActive = true
+          syncAutoImgEl()
+          startAutoImgAnim()
+        } else {
+          // Mobile: static placed image
+          const el = document.createElement('img')
+          el.src = dataUrl
+          el.className = 'placed-image'
+          el.style.cssText = 'position:fixed;pointer-events:none;z-index:2;'
+          document.body.appendChild(el)
+          const alphaEdges = scanAlphaEdges(img)
+          const placed: PlacedImage = {
+            el, dataUrl, x: (W - w) / 2, y: (H - h) / 2, w, h,
+            shape: 'original', dragging: false, dragOffsetX: 0, dragOffsetY: 0,
+            alphaEdges,
+          }
+          syncImageEl(placed)
+          placedImages.push(placed)
+          render()
         }
-        syncImageEl(placed)
-        placedImages.push(placed)
-        render()
       }
       img.src = dataUrl
     }
@@ -553,15 +935,105 @@ if (resetBtn) {
     e.stopPropagation()
     for (let i = 0; i < placedImages.length; i++) placedImages[i]!.el.remove()
     placedImages.length = 0; pointer = null; strokes.length = 0; currentStroke = null
+    stopAutoImgAnim()
     render()
   })
 }
 
+// --- Mode toggle ---
+const modeMobileBtn = document.getElementById('mode-mobile')
+const modeDesktopBtn = document.getElementById('mode-desktop')
+function setMode(m: Mode) {
+  mode = m
+  if (m === 'desktop') {
+    quoteX = W - DESK_PAD - QUOTE_W
+    quoteY = H / 2
+    if (autoImgActive) startAutoImgAnim()
+  } else {
+    stopAutoImgAnim()
+  }
+  if (modeMobileBtn && modeDesktopBtn) {
+    modeMobileBtn.classList.toggle('mode-active', m === 'mobile')
+    modeDesktopBtn.classList.toggle('mode-active', m === 'desktop')
+  }
+  render()
+}
+if (modeMobileBtn) {
+  modeMobileBtn.addEventListener('pointerdown', function (e) { e.stopPropagation() })
+  modeMobileBtn.addEventListener('click', function (e) { e.stopPropagation(); setMode('mobile') })
+}
+if (modeDesktopBtn) {
+  modeDesktopBtn.addEventListener('pointerdown', function (e) { e.stopPropagation() })
+  modeDesktopBtn.addEventListener('click', function (e) { e.stopPropagation(); setMode('desktop') })
+}
+
+// --- Auto-moving image animation ---
+function syncAutoImgEl() {
+  if (!autoImgEl) return
+  autoImgEl.style.left = autoImgX + 'px'
+  autoImgEl.style.top = autoImgY + 'px'
+  autoImgEl.style.width = autoImgW + 'px'
+  autoImgEl.style.height = autoImgH + 'px'
+}
+
+let autoImgAnimId = 0
+function startAutoImgAnim() {
+  function tick() {
+    if (!autoImgActive || mode !== 'desktop') { autoImgAnimId = 0; return }
+
+    autoImgX += autoImgVx
+    autoImgY += autoImgVy
+    const minX = DESK_PAD
+    const maxX = W - DESK_PAD - autoImgW
+    const minY = TOP_BAR_HEIGHT + DESK_PAD
+    const maxYB = H - DESK_PAD - autoImgH
+    if (autoImgX <= minX || autoImgX >= maxX) autoImgVx = -autoImgVx
+    if (autoImgY <= minY || autoImgY >= maxYB) autoImgVy = -autoImgVy
+    autoImgX = Math.max(minX, Math.min(maxX, autoImgX))
+    autoImgY = Math.max(minY, Math.min(maxYB, autoImgY))
+
+    syncAutoImgEl()
+    render()
+    autoImgAnimId = requestAnimationFrame(tick)
+  }
+  if (!autoImgAnimId) autoImgAnimId = requestAnimationFrame(tick)
+}
+
+function stopAutoImgAnim() {
+  if (autoImgEl) { autoImgEl.remove(); autoImgEl = null }
+  autoImgActive = false
+  autoImgAnimId = 0
+}
+
+// --- Desktop mouse tracking for heat map ---
+canvas.addEventListener('mousemove', function (e) {
+  if (mode === 'desktop') {
+    // Ignore when mouse is near top bar or bottom bar
+    if (e.clientY < TOP_BAR_HEIGHT + 10 || e.clientY > H - 10) {
+      if (desktopMouse) { desktopMouse = null; render() }
+      return
+    }
+    desktopMouse = { x: e.clientX, y: e.clientY }
+    render()
+  }
+})
+canvas.addEventListener('mouseleave', function () {
+  desktopMouse = null
+  if (mode === 'desktop') render()
+})
+
 // --- Boot ---
+quoteX = 600
+quoteY = 300
 try {
   for (let i = 0; i < PARAGRAPHS.length; i++) {
     preparedParas.push(prepareWithSegments(PARAGRAPHS[i]!, FONT))
+    preparedDesk.push(prepareWithSegments(PARAGRAPHS[i]!, DESK_FONT))
   }
+  preparedQuote = prepareWithSegments(QUOTE_TEXT, QUOTE_FONT)
+  preparedTitle = prepareWithSegments(TITLE_TEXT, DESK_TITLE_FONT)
+  preparedSub = prepareWithSegments(SUB_TEXT, DESK_SUB_FONT)
+  cacheQuoteWidths()
 } catch (e) { console.error('prepareWithSegments failed:', e) }
 window.addEventListener('resize', resize)
 resize()
