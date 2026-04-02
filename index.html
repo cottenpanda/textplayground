@@ -10,6 +10,14 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #0f0f1a; }
+    @keyframes float {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      25% { transform: translateY(-6px) rotate(1deg); }
+      75% { transform: translateY(4px) rotate(-1deg); }
+    }
+    .placed-image {
+      animation: float 3s ease-in-out infinite;
+    }
     canvas {
       position: fixed;
       top: 0;

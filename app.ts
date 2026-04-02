@@ -452,6 +452,7 @@ if (uploadBtn && fileInput) {
         const w = img.width * scale, h = img.height * scale
         const el = document.createElement('img')
         el.src = dataUrl
+        el.className = 'placed-image'
         el.style.cssText = 'position:fixed;pointer-events:none;z-index:2;'
         document.body.appendChild(el)
         const alphaEdges = scanAlphaEdges(img)
