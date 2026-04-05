@@ -1017,11 +1017,11 @@ let defaultDanceImage: PlacedImage | null = null
     el.className = 'placed-image'
     el.style.cssText = 'position:fixed;pointer-events:none;z-index:2;'
     document.body.appendChild(el)
-    const alphaEdges = scanAlphaEdges(danceImg)
+    // Use rectangle bounding box (no alpha edges) for clean wrapping on animated GIF
     const placed: PlacedImage = {
       el, dataUrl: danceImg.src, x: DESK_PAD, y: TOP_BAR_HEIGHT + DESK_PAD, w, h,
       shape: 'original', dragging: false, dragOffsetX: 0, dragOffsetY: 0,
-      alphaEdges,
+      alphaEdges: null,
     }
     syncImageEl(placed)
     placedImages.push(placed)

@@ -2318,40 +2318,6 @@ var currentStroke = null;
 var PATH_RADIUS = 18;
 var SHAPES = ["original", "circle", "square"];
 var placedImages = [];
-function scanAlphaEdges(img) {
-  const oc = new OffscreenCanvas(img.naturalWidth, img.naturalHeight);
-  const octx = oc.getContext("2d");
-  if (!octx)
-    return null;
-  octx.drawImage(img, 0, 0);
-  const { data, width, height } = octx.getImageData(0, 0, img.naturalWidth, img.naturalHeight);
-  let hasTransparency = false;
-  for (let i = 3;i < data.length; i += 4) {
-    if (data[i] < 200) {
-      hasTransparency = true;
-      break;
-    }
-  }
-  if (!hasTransparency)
-    return null;
-  const edges = [];
-  for (let y = 0;y < height; y++) {
-    let left = -1, right = -1;
-    for (let x = 0;x < width; x++) {
-      if (data[(y * width + x) * 4 + 3] > 20) {
-        if (left === -1)
-          left = x;
-        right = x;
-      }
-    }
-    if (left === -1) {
-      edges.push(null);
-    } else {
-      edges.push({ left: left / width, right: (right + 1) / width });
-    }
-  }
-  return edges;
-}
 function getFingerIntervalsForBand(bandTop, bandBottom) {
   if (!pointer)
     return [];
@@ -3253,7 +3219,6 @@ var defaultDanceImage = null;
     el.className = "placed-image";
     el.style.cssText = "position:fixed;pointer-events:none;z-index:2;";
     document.body.appendChild(el);
-    const alphaEdges = scanAlphaEdges(danceImg);
     const placed = {
       el,
       dataUrl: danceImg.src,
@@ -3265,7 +3230,7 @@ var defaultDanceImage = null;
       dragging: false,
       dragOffsetX: 0,
       dragOffsetY: 0,
-      alphaEdges
+      alphaEdges: null
     };
     syncImageEl(placed);
     placedImages.push(placed);
