@@ -3303,28 +3303,21 @@ resize();
     const maxSize = 150;
     const scale = Math.min(maxSize / danceImg.width, maxSize / danceImg.height, 1);
     const w = danceImg.width * scale, h = danceImg.height * scale;
+    if (autoImgEl)
+      autoImgEl.remove();
     const el = document.createElement("img");
     el.src = danceImg.src;
-    el.className = "placed-image";
-    el.style.cssText = "position:fixed;pointer-events:none;z-index:2;";
+    el.style.cssText = "position:fixed;pointer-events:none;z-index:2;object-fit:contain;";
     document.body.appendChild(el);
-    const alphaEdges = scanAlphaEdges(danceImg);
-    const placed = {
-      el,
-      dataUrl: danceImg.src,
-      x: DESK_PAD,
-      y: TOP_BAR_HEIGHT + DESK_PAD,
-      w,
-      h,
-      shape: "original",
-      dragging: false,
-      dragOffsetX: 0,
-      dragOffsetY: 0,
-      alphaEdges
-    };
-    syncImageEl(placed);
-    placedImages.push(placed);
-    render();
+    autoImgEl = el;
+    autoImgW = w;
+    autoImgH = h;
+    autoImgAlphaEdges = scanAlphaEdges(danceImg);
+    autoImgX = DESK_PAD;
+    autoImgY = TOP_BAR_HEIGHT + DESK_PAD;
+    autoImgActive = true;
+    syncAutoImgEl();
+    startAutoImgAnim();
   };
   danceImg.src = "./Dance Dancing Sticker by Neil Sanders.gif";
 }
