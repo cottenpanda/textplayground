@@ -3008,59 +3008,6 @@ function pointerUp() {
 }
 canvas.addEventListener("pointerup", pointerUp);
 canvas.addEventListener("pointercancel", pointerUp);
-var uploadBtn = document.getElementById("upload-btn");
-var fileInput = document.getElementById("file-input");
-if (uploadBtn && fileInput) {
-  uploadBtn.addEventListener("pointerdown", function(e) {
-    e.stopPropagation();
-  });
-  uploadBtn.addEventListener("click", function(e) {
-    e.stopPropagation();
-    fileInput.click();
-  });
-  fileInput.addEventListener("change", function() {
-    const file = fileInput.files?.[0];
-    if (!file)
-      return;
-    const reader = new FileReader;
-    reader.onload = function() {
-      const dataUrl = reader.result;
-      const img = new Image;
-      img.onload = function() {
-        const maxSize = 150;
-        const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
-        const w = img.width * scale, h = img.height * scale;
-        {
-          const el = document.createElement("img");
-          el.src = dataUrl;
-          el.className = "placed-image";
-          el.style.cssText = "position:fixed;pointer-events:none;z-index:2;";
-          document.body.appendChild(el);
-          const alphaEdges = scanAlphaEdges(img);
-          const placed = {
-            el,
-            dataUrl,
-            x: (W - w) / 2,
-            y: (H - h) / 2,
-            w,
-            h,
-            shape: "original",
-            dragging: false,
-            dragOffsetX: 0,
-            dragOffsetY: 0,
-            alphaEdges
-          };
-          syncImageEl(placed);
-          placedImages.push(placed);
-          render();
-        }
-      };
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(file);
-    fileInput.value = "";
-  });
-}
 var fallingWords = [];
 var isFalling = false;
 function collectVisibleWords() {
@@ -3168,16 +3115,19 @@ if (resetBtn) {
   });
   resetBtn.addEventListener("click", function(e) {
     e.stopPropagation();
-    for (let i = 0;i < placedImages.length; i++)
-      placedImages[i].el.remove();
+    for (let i = 0;i < placedImages.length; i++) {
+      if (placedImages[i] !== defaultDanceImage)
+        placedImages[i].el.remove();
+    }
     placedImages.length = 0;
     pointer = null;
     strokes.length = 0;
     currentStroke = null;
-    if (autoImgActive) {
-      autoImgX = DESK_PAD;
-      autoImgY = TOP_BAR_HEIGHT + DESK_PAD;
-      syncAutoImgEl();
+    if (defaultDanceImage) {
+      defaultDanceImage.x = DESK_PAD;
+      defaultDanceImage.y = TOP_BAR_HEIGHT + DESK_PAD;
+      syncImageEl(defaultDanceImage);
+      placedImages.push(defaultDanceImage);
     }
     render();
   });
@@ -3291,27 +3241,36 @@ try {
 }
 window.addEventListener("resize", resize);
 resize();
+var defaultDanceImage = null;
 {
   const danceImg = new Image;
   danceImg.onload = function() {
     const maxSize = 150;
     const scale = Math.min(maxSize / danceImg.width, maxSize / danceImg.height, 1);
     const w = danceImg.width * scale, h = danceImg.height * scale;
-    if (autoImgEl)
-      autoImgEl.remove();
     const el = document.createElement("img");
     el.src = danceImg.src;
-    el.style.cssText = "position:fixed;pointer-events:none;z-index:2;object-fit:contain;";
+    el.className = "placed-image";
+    el.style.cssText = "position:fixed;pointer-events:none;z-index:2;";
     document.body.appendChild(el);
-    autoImgEl = el;
-    autoImgW = w;
-    autoImgH = h;
-    autoImgAlphaEdges = scanAlphaEdges(danceImg);
-    autoImgX = DESK_PAD;
-    autoImgY = TOP_BAR_HEIGHT + DESK_PAD;
-    autoImgActive = true;
-    syncAutoImgEl();
-    startAutoImgAnim();
+    const alphaEdges = scanAlphaEdges(danceImg);
+    const placed = {
+      el,
+      dataUrl: danceImg.src,
+      x: DESK_PAD,
+      y: TOP_BAR_HEIGHT + DESK_PAD,
+      w,
+      h,
+      shape: "original",
+      dragging: false,
+      dragOffsetX: 0,
+      dragOffsetY: 0,
+      alphaEdges
+    };
+    syncImageEl(placed);
+    placedImages.push(placed);
+    defaultDanceImage = placed;
+    render();
   };
   danceImg.src = "./Dance Dancing Sticker by Neil Sanders.gif";
 }
