@@ -2644,7 +2644,7 @@ function deskColumn(paras, startPara, startCursor, left, right, startY, maxY, fo
     while (y + lh <= maxY && !done) {
       const bandTop = y;
       const bandBottom = y + lh;
-      const blocked = getQuoteIntervalForBand(bandTop, bandBottom).concat(getAutoImgIntervalForBand(bandTop, bandBottom));
+      const blocked = getQuoteIntervalForBand(bandTop, bandBottom).concat(getAutoImgIntervalForBand(bandTop, bandBottom)).concat(getImageIntervalsForBand(bandTop, bandBottom)).concat(getFingerIntervalsForBand(bandTop, bandBottom)).concat(getStrokeIntervalsForBand(bandTop, bandBottom));
       const slots = carveSlots({ left, right }, blocked);
       if (slots.length === 0) {
         y += lh;
