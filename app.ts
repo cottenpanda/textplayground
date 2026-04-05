@@ -1038,4 +1038,30 @@ try {
 } catch (e) { console.error('prepareWithSegments failed:', e) }
 window.addEventListener('resize', resize)
 resize()
+
+// --- Load dance gif into top-left of column 1 ---
+{
+  const danceImg = new Image()
+  danceImg.onload = function () {
+    const maxSize = 150
+    const scale = Math.min(maxSize / danceImg.width, maxSize / danceImg.height, 1)
+    const w = danceImg.width * scale, h = danceImg.height * scale
+    const el = document.createElement('img')
+    el.src = danceImg.src
+    el.className = 'placed-image'
+    el.style.cssText = 'position:fixed;pointer-events:none;z-index:2;'
+    document.body.appendChild(el)
+    const alphaEdges = scanAlphaEdges(danceImg)
+    const placed: PlacedImage = {
+      el, dataUrl: danceImg.src, x: DESK_PAD, y: TOP_BAR_HEIGHT + DESK_PAD, w, h,
+      shape: 'original', dragging: false, dragOffsetX: 0, dragOffsetY: 0,
+      alphaEdges,
+    }
+    syncImageEl(placed)
+    placedImages.push(placed)
+    render()
+  }
+  danceImg.src = './Dance Dancing Sticker by Neil Sanders.gif'
+}
+
 console.log('Text Playground: ready')
