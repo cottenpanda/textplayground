@@ -3030,23 +3030,7 @@ if (uploadBtn && fileInput) {
         const maxSize = 150;
         const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
         const w = img.width * scale, h = img.height * scale;
-        if (mode === "desktop") {
-          if (autoImgEl)
-            autoImgEl.remove();
-          const el = document.createElement("img");
-          el.src = dataUrl;
-          el.style.cssText = "position:fixed;pointer-events:none;z-index:2;object-fit:contain;";
-          document.body.appendChild(el);
-          autoImgEl = el;
-          autoImgW = w;
-          autoImgH = h;
-          autoImgAlphaEdges = scanAlphaEdges(img);
-          autoImgX = DESK_PAD;
-          autoImgY = TOP_BAR_HEIGHT + DESK_PAD + 40;
-          autoImgActive = true;
-          syncAutoImgEl();
-          startAutoImgAnim();
-        } else {
+        {
           const el = document.createElement("img");
           el.src = dataUrl;
           el.className = "placed-image";
