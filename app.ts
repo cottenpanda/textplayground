@@ -529,13 +529,6 @@ function render() {
     const startY = pad + topOffset
     const maxY = H - pad
 
-    // Column dividers
-    ctx.strokeStyle = 'rgba(255,255,255,0.06)'
-    ctx.lineWidth = 1
-    for (const dx of [(col1R + col2L) / 2, (col2R + col3L) / 2]) {
-      ctx.beginPath(); ctx.moveTo(dx, startY); ctx.lineTo(dx, maxY); ctx.stroke()
-    }
-
     // Column 1: headline + subtitle (using pretext, wraps around obstacles)
     let c1y = startY
 

@@ -2753,14 +2753,6 @@ function render() {
     const col3L = col2R + gap, col3R = col3L + colWidth;
     const startY = pad + topOffset;
     const maxY = H - pad;
-    ctx.strokeStyle = "rgba(255,255,255,0.06)";
-    ctx.lineWidth = 1;
-    for (const dx of [(col1R + col2L) / 2, (col2R + col3L) / 2]) {
-      ctx.beginPath();
-      ctx.moveTo(dx, startY);
-      ctx.lineTo(dx, maxY);
-      ctx.stroke();
-    }
     let c1y = startY;
     if (preparedTitle) {
       ctx.font = DESK_TITLE_FONT;
