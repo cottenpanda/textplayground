@@ -936,7 +936,12 @@ if (resetBtn) {
     e.stopPropagation()
     for (let i = 0; i < placedImages.length; i++) placedImages[i]!.el.remove()
     placedImages.length = 0; pointer = null; strokes.length = 0; currentStroke = null
-    stopAutoImgAnim()
+    // Reset auto-moving image to starting position
+    if (autoImgActive) {
+      autoImgX = DESK_PAD
+      autoImgY = TOP_BAR_HEIGHT + DESK_PAD
+      syncAutoImgEl()
+    }
     render()
   })
 }

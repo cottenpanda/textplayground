@@ -3181,7 +3181,11 @@ if (resetBtn) {
     pointer = null;
     strokes.length = 0;
     currentStroke = null;
-    stopAutoImgAnim();
+    if (autoImgActive) {
+      autoImgX = DESK_PAD;
+      autoImgY = TOP_BAR_HEIGHT + DESK_PAD;
+      syncAutoImgEl();
+    }
     render();
   });
 }
