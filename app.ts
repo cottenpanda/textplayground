@@ -12,7 +12,7 @@ const PARAGRAPHS = [
 ]
 
 type Mode = 'mobile' | 'desktop'
-let mode: Mode = 'mobile'
+let mode: Mode = 'desktop'
 
 const FONT = '16px "Source Code Pro", monospace'
 const LINE_HEIGHT = 24

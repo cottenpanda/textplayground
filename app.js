@@ -2262,7 +2262,7 @@ var PARAGRAPHS = [
   `As you work, patterns start to emerge, decisions become clearer, and what once felt messy turns into something intentional. The goal isn't to force structure too early, but to let it happen naturally through iteration. Everything here is built to support clarity and flow. Information is organized in a way that helps you quickly understand what's happening, what needs attention, and what comes next. You can move between different states—exploring, editing, finalizing—without friction. The system adapts as your needs change, so you're never locked into a single way of working.`,
   `Sometimes the hardest part is simply starting. Once you begin, things shift. Ideas connect, directions form, and small steps add up. This space is meant to support that process quietly in the background—giving you just enough structure to stay grounded, while leaving room for exploration and change. Design is rarely a straight line. It moves between uncertainty and clarity, exploration and decision. This environment is built to support that rhythm—helping you navigate complexity, test ideas quickly, and shape outcomes with intention. Over time, what starts as ambiguity becomes something structured, thoughtful, and real.`
 ];
-var mode = "mobile";
+var mode = "desktop";
 var FONT = '16px "Source Code Pro", monospace';
 var LINE_HEIGHT = 24;
 var PADDING = 16;
