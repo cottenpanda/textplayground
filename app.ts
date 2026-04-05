@@ -547,6 +547,9 @@ function render() {
       while (c1y + DESK_TITLE_LH <= maxY) {
         const blocked = getQuoteIntervalForBand(c1y, c1y + DESK_TITLE_LH)
           .concat(getAutoImgIntervalForBand(c1y, c1y + DESK_TITLE_LH))
+          .concat(getFingerIntervalsForBand(c1y, c1y + DESK_TITLE_LH))
+          .concat(getImageIntervalsForBand(c1y, c1y + DESK_TITLE_LH))
+          .concat(getStrokeIntervalsForBand(c1y, c1y + DESK_TITLE_LH))
         const slots = carveSlots({ left: col1L, right: col1R }, blocked)
         if (slots.length === 0) { c1y += DESK_TITLE_LH; continue }
         const line = layoutNextLine(preparedTitle, titleCursor, slots[0]!.right - slots[0]!.left)
@@ -567,6 +570,9 @@ function render() {
       while (c1y + subLH <= maxY) {
         const blocked = getQuoteIntervalForBand(c1y, c1y + subLH)
           .concat(getAutoImgIntervalForBand(c1y, c1y + subLH))
+          .concat(getFingerIntervalsForBand(c1y, c1y + subLH))
+          .concat(getImageIntervalsForBand(c1y, c1y + subLH))
+          .concat(getStrokeIntervalsForBand(c1y, c1y + subLH))
         const slots = carveSlots({ left: col1L, right: col1R }, blocked)
         if (slots.length === 0) { c1y += subLH; continue }
         const line = layoutNextLine(preparedSub, subCursor, slots[0]!.right - slots[0]!.left)
