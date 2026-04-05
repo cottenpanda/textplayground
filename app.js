@@ -2822,6 +2822,14 @@ function render() {
     ctx.textAlign = "left";
   }
 }
+function centerQuoteInCol2() {
+  const pad = DESK_PAD;
+  const gap = DESK_COL_GAP;
+  const colWidth = (W - pad * 2 - gap * 2) / 3;
+  const col2L = pad + colWidth + gap;
+  quoteX = col2L + (colWidth - QUOTE_W) / 2;
+  quoteY = (H - QUOTE_H) / 2;
+}
 function resize() {
   const dpr = window.devicePixelRatio || 1;
   W = window.innerWidth;
@@ -2830,6 +2838,7 @@ function resize() {
   canvas.height = H * dpr;
   canvas.style.height = H + "px";
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  centerQuoteInCol2();
   render();
 }
 function getClipPath(shape, w, h) {
@@ -3194,8 +3203,7 @@ var modeDesktopBtn = document.getElementById("mode-desktop");
 function setMode(m) {
   mode = m;
   if (m === "desktop") {
-    quoteX = W - DESK_PAD - QUOTE_W;
-    quoteY = H / 2;
+    centerQuoteInCol2();
     if (autoImgActive)
       startAutoImgAnim();
   } else {
@@ -3285,8 +3293,6 @@ canvas.addEventListener("mouseleave", function() {
   if (mode === "desktop")
     render();
 });
-quoteX = 600;
-quoteY = 300;
 try {
   for (let i = 0;i < PARAGRAPHS.length; i++) {
     preparedParas.push(prepareWithSegments(PARAGRAPHS[i], FONT));

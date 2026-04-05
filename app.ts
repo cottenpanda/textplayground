@@ -615,6 +615,16 @@ function render() {
   }
 }
 
+// --- Center quote in column 2 ---
+function centerQuoteInCol2() {
+  const pad = DESK_PAD
+  const gap = DESK_COL_GAP
+  const colWidth = (W - pad * 2 - gap * 2) / 3
+  const col2L = pad + colWidth + gap
+  quoteX = col2L + (colWidth - QUOTE_W) / 2
+  quoteY = (H - QUOTE_H) / 2
+}
+
 // --- Resize ---
 function resize() {
   const dpr = window.devicePixelRatio || 1
@@ -624,6 +634,7 @@ function resize() {
   canvas.height = H * dpr
   canvas.style.height = H + 'px'
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  centerQuoteInCol2()
   render()
 }
 
@@ -952,8 +963,7 @@ const modeDesktopBtn = document.getElementById('mode-desktop')
 function setMode(m: Mode) {
   mode = m
   if (m === 'desktop') {
-    quoteX = W - DESK_PAD - QUOTE_W
-    quoteY = H / 2
+    centerQuoteInCol2()
     if (autoImgActive) startAutoImgAnim()
   } else {
     stopAutoImgAnim()
@@ -1029,8 +1039,7 @@ canvas.addEventListener('mouseleave', function () {
 })
 
 // --- Boot ---
-quoteX = 600
-quoteY = 300
+// Quote position will be set after first resize
 try {
   for (let i = 0; i < PARAGRAPHS.length; i++) {
     preparedParas.push(prepareWithSegments(PARAGRAPHS[i]!, FONT))
