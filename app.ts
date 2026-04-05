@@ -904,6 +904,8 @@ if (resetBtn) {
       syncImageEl(defaultDanceImage)
       placedImages.push(defaultDanceImage)
     }
+    // Reset quote to centered position
+    centerQuoteInCol2()
     render()
   })
 }

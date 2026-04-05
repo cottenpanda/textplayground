@@ -3095,6 +3095,7 @@ if (resetBtn) {
       syncImageEl(defaultDanceImage);
       placedImages.push(defaultDanceImage);
     }
+    centerQuoteInCol2();
     render();
   });
 }
